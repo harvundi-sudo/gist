@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gist — the lazy reader's best friend</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://js.puter.com/v2/"></script>
+<style>
+  :root{
+    --ink:#191D28;
+    --ink-soft:#242938;
+    --ink-softer:#2E3446;
+    --paper:#F4EFE0;
+    --paper-dim:#C9C4B4;
+    --highlight:#E8FF4D;
+    --highlight-dim:#B8CC30;
+    --plum:#8B7FDB;
+    --muted:#9096AC;
+    --line: rgba(244,239,224,0.12);
+    --danger:#E2725B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:56px 24px 80px;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--highlight);
+    margin:0 0 14px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:52px;
+    line-height:1.02;
+    margin:0 0 14px;
+    letter-spacing:-0.01em;
+  }
+  h1 .strike{
+    position:relative;
+    display:inline-block;
+  }
+  h1 .strike::after{
+    content:'';
+    position:absolute;
+    left:-2%;
+    right:-2%;
+    bottom:10%;
+    height:0.34em;
+    background:var(--highlight);
+    z-index:-1;
+    transform:scaleX(0);
+    transform-origin:left;
+    animation:swipe 0.7s cubic-bezier(.65,0,.35,1) 0.15s forwards;
+  }
+  @keyframes swipe{ to{ transform:scaleX(1);} }
+  .sub{
+    font-size:17px;
+    line-height:1.55;
+    color:var(--muted);
+    max-width:460px;
+    margin:0 0 32px;
+  }
+  .sub b{ color:var(--paper); font-weight:500; }
+
+  /* Top banner ad slot */
+  .ad-banner{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    background:var(--ink-soft);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 18px;
+    margin-bottom:36px;
+  }
+  .ad-banner .ad-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:2px 6px;
+    flex-shrink:0;
+  }
+  .ad-banner .ad-body{ flex:1; font-size:13.5px; color:var(--paper); }
+  .ad-banner .ad-body a{ color:var(--highlight); text-decoration:none; font-weight:500; }
+  .ad-banner .ad-body a:hover{ text-decoration:underline; }
+
+  .tabs{
+    display:flex;
+    gap:4px;
+    background:var(--ink-soft);
+    padding:4px;
+    border-radius:10px;
+    margin-bottom:16px;
+    width:fit-content;
+  }
+  .tab{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:500;
+    color:var(--muted);
+    background:none;
+    border:none;
+    padding:9px 18px;
+    border-radius:7px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tab.active{ background:var(--ink-softer); color:var(--paper); }
+  .tab:hover:not(.active){ color:var(--paper); }
+
+  .panel{
+    background:var(--ink-soft);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px;
+    margin-bottom:20px;
+  }
+
+  .dropzone{
+    border:1.5px dashed var(--paper-dim);
+    border-radius:10px;
+    padding:38px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--highlight);
+    background:rgba(232,255,77,0.04);
+  }
+  .dropzone .ic{ font-size:26px; margin-bottom:10px; opacity:0.7; }
+  .dropzone p{ margin:0; font-size:14px; color:var(--muted); }
+  .dropzone .fname{
+    margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:13px;
+    color:var(--highlight);
+  }
+  input[type=file]{ display:none; }
+
+  textarea{
+    width:100%;
+    min-height:200px;
+    background:var(--ink);
+    border:1px solid var(--line);
+    border-radius:10px;
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    line-height:1.6;
+    padding:16px;
+    resize:vertical;
+  }
+  textarea:focus{ outline:none; border-color:var(--highlight-dim); }
+  textarea::placeholder{ color:var(--muted); }
+
+  .row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+  .field{ flex:1; min-width:160px; }
+  .field label{
+    display:block; font-size:12px; color:var(--muted);
+    margin-bottom:6px; font-family:'JetBrains Mono',monospace;
+    text-transform:uppercase; letter-spacing:0.06em;
+  }
+  select{
+    width:100%;
+    background:var(--ink);
+    color:var(--paper);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    cursor:pointer;
+  }
+  select:focus{ outline:none; border-color:var(--highlight-dim); }
+
+  .go{
+    margin-top:20px;
+    width:100%;
+    background:var(--highlight);
+    color:var(--ink);
+    border:none;
+    border-radius:10px;
+    padding:15px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    transition:transform .1s ease, background .15s ease;
+  }
+  .go:hover{ background:var(--highlight-dim); }
+  .go:active{ transform:scale(0.99); }
+  .go:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .error{
+    color:var(--danger);
+    font-size:13.5px;
+    margin-top:12px;
+    display:none;
+  }
+
+  .loading{ display:none; margin-top:20px; }
+  .loading.show{ display:block; }
+  .loadbar{
+    height:3px; background:var(--ink-softer); border-radius:2px; overflow:hidden; margin-bottom:10px;
+  }
+  .loadbar::after{
+    content:''; display:block; height:100%; width:40%; background:var(--highlight);
+    animation:load 1.1s ease-in-out infinite;
+  }
+  @keyframes load{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(350%);} }
+  .loadtext{ font-size:13px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+
+  .results{ display:none; margin-top:32px; }
+  .results.show{ display:block; animation:fadein .4s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    border-radius:12px;
+    overflow:hidden;
+    margin-bottom:24px;
+  }
+  .stat{ background:var(--ink-soft); padding:16px 14px; }
+  .stat .n{ font-family:'JetBrains Mono',monospace; font-size:22px; color:var(--highlight); font-weight:500; }
+  .stat .l{ font-size:11.5px; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:0.05em; }
+
+  .summary-block{
+    background:var(--ink-soft);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px 26px 22px;
+  }
+  .summary-block h2{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:20px;
+    margin:0 0 14px;
+    color:var(--highlight);
+  }
+  .summary-text{
+    font-family:'Fraunces',serif;
+    font-size:17px;
+    line-height:1.65;
+    color:var(--paper);
+    margin:0 0 22px;
+    white-space:pre-wrap;
+  }
+  .keypoints{ list-style:none; padding:0; margin:0; }
+  .keypoints li{
+    display:flex; gap:10px; font-size:14.5px; line-height:1.55;
+    color:var(--paper); padding:10px 0; border-top:1px solid var(--line);
+  }
+  .keypoints li:first-child{ border-top:none; }
+  .keypoints li .bullet{ color:var(--highlight); flex-shrink:0; font-family:'JetBrains Mono',monospace; }
+
+  .actions{ display:flex; gap:10px; margin-top:18px; }
+  .actions button{
+    background:none;
+    border:1px solid var(--line);
+    color:var(--paper);
+    border-radius:8px;
+    padding:9px 14px;
+    font-size:13px;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    transition:border-color .15s ease;
+  }
+  .actions button:hover{ border-color:var(--paper-dim); }
+
+  .footnote{
+    margin-top:14px; font-size:12.5px; color:var(--muted); line-height:1.5;
+  }
+
+  /* Sponsored apps section */
+  .sponsored{ margin-top:44px; }
+  .sponsored .heading{
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .sponsored .heading span{
+    font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase;
+    letter-spacing:0.1em; color:var(--muted);
+  }
+  .sponsored .heading::after{
+    content:''; flex:1; height:1px; background:var(--line);
+  }
+  .sponsor-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+    gap:12px;
+  }
+  .sponsor-card{
+    background:var(--ink-soft);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    text-decoration:none;
+    color:var(--paper);
+    display:block;
+    transition:border-color .15s ease;
+  }
+  .sponsor-card:hover{ border-color:var(--paper-dim); }
+  .sponsor-card .stag{
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; text-transform:uppercase;
+    letter-spacing:0.08em; color:var(--muted); border:1px solid var(--line);
+    display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:8px;
+  }
+  .sponsor-card .stitle{ font-size:14.5px; font-weight:500; margin-bottom:4px; }
+  .sponsor-card .sdesc{ font-size:12.5px; color:var(--muted); line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Gist</p>
+  <h1>Skip the <span class="strike">book.</span><br>Keep the point.</h1>
+  <p class="sub">Paste or upload any text — a chapter, an article, an entire novel — and get <b>the actual point of it</b>, in whatever language you'd rather read it in.</p>
+
+  <!-- SPONSORED BANNER SLOT: edit adBannerConfig in the script below, or replace this
+       div's contents with an ad network's embed code (e.g. AdSense) -->
+  <div class="ad-banner" id="adBanner" style="display:none;">
+    <span class="ad-tag">Sponsored</span>
+    <span class="ad-body" id="adBannerBody"></span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="upload">Upload file</button>
+    <button class="tab" data-tab="paste">Paste text</button>
+  </div>
+
+  <div class="panel" id="panel-upload">
+    <div class="dropzone" id="dropzone">
+      <div class="ic">⇪</div>
+      <p>Drop a .txt, .pdf, or .docx here, or click to browse</p>
+      <div class="fname" id="fname"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
+  </div>
+
+  <div class="panel" id="panel-paste" style="display:none;">
+    <textarea id="pasteArea" placeholder="Paste your text here — a chapter, an essay, class notes, whatever you're avoiding reading in full."></textarea>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="field">
+        <label>Summary length</label>
+        <select id="lengthSelect">
+          <option value="quick">Quick gist (a few lines)</option>
+          <option value="standard" selected>Standard (a solid paragraph)</option>
+          <option value="detailed">Detailed (the full shape of it)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Output language</label>
+        <select id="langSelect">
+          <option value="English" selected>English</option>
+          <option value="Spanish">Spanish</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Portuguese">Portuguese</option>
+          <option value="Italian">Italian</option>
+          <option value="Japanese">Japanese</option>
+          <option value="Korean">Korean</option>
+          <option value="Mandarin Chinese">Mandarin Chinese</option>
+          <option value="Hindi">Hindi</option>
+          <option value="Arabic">Arabic</option>
+          <option value="Russian">Russian</option>
+        </select>
+      </div>
+    </div>
+    <button class="go" id="goBtn">Summarize it</button>
+    <p class="error" id="errorMsg"></p>
+    <div class="loading" id="loading">
+      <div class="loadbar"></div>
+      <p class="loadtext" id="loadText">Reading so you don't have to…</p>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="stats">
+      <div class="stat"><div class="n" id="statOriginal">–</div><div class="l">Minutes to read it</div></div>
+      <div class="stat"><div class="n" id="statSummary">–</div><div class="l">Minutes to read this</div></div>
+      <div class="stat"><div class="n" id="statSaved">–</div><div class="l">Minutes saved</div></div>
+    </div>
+    <div class="summary-block">
+      <h2>The gist</h2>
+      <p class="summary-text" id="summaryText"></p>
+      <ul class="keypoints" id="keyPoints"></ul>
+    </div>
+    <div class="actions">
+      <button id="copyBtn">Copy summary</button>
+      <button id="regenBtn">Regenerate with current settings</button>
+    </div>
+    <p class="footnote">Summaries are AI-generated and can miss nuance — good for getting the gist, not for citing in your essay.</p>
+  </div>
+
+  <!-- SPONSORED APPS SLOT: edit sponsorConfig in the script below to add/remove cards -->
+  <div class="sponsored" id="sponsoredSection" style="display:none;">
+    <div class="heading"><span>Sponsored</span></div>
+    <div class="sponsor-grid" id="sponsorGrid"></div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- MONETIZATION CONFIG ----------
+   Edit these two arrays/objects to control what shows up. Leave a config
+   empty (null, or an empty array) and that slot stays hidden automatically.
+   To sell these slots, this is the only part of the file a sponsor's info
+   needs to touch. */
+
+// Single banner line near the top. Set to null to hide.
+const adBannerConfig = null;
+// Example:
+// const adBannerConfig = {
+//   text: 'Try Focusmate for free — pair up and get more reading done.',
+//   linkText: 'Learn more',
+//   url: 'https://example.com'
+// };
+
+// Row of sponsored app/tool cards near the bottom. Set to [] to hide.
+const sponsorConfig = [];
+// Example:
+// const sponsorConfig = [
+//   { tag: 'Sponsored', title: 'Readwise', desc: 'Save and revisit highlights from everything you read.', url: 'https://readwise.io' },
+//   { tag: 'Sponsored', title: 'Blinkist', desc: 'Book summaries in audio and text, for your commute.', url: 'https://blinkist.com' }
+// ];
+
+function renderSponsors(){
+  if(adBannerConfig){
+    const banner = document.getElementById('adBanner');
+    const body = document.getElementById('adBannerBody');
+    body.innerHTML = adBannerConfig.text + ' <a href="' + adBannerConfig.url + '" target="_blank" rel="noopener sponsored">' + (adBannerConfig.linkText || 'Learn more') + '</a>';
+    banner.style.display = 'flex';
+  }
+  if(sponsorConfig && sponsorConfig.length){
+    const section = document.getElementById('sponsoredSection');
+    const grid = document.getElementById('sponsorGrid');
+    grid.innerHTML = '';
+    sponsorConfig.forEach(function(s){
+      const a = document.createElement('a');
+      a.className = 'sponsor-card';
+      a.href = s.url;
+      a.target = '_blank';
+      a.rel = 'noopener sponsored';
+      a.innerHTML = '<div class="stag">' + (s.tag || 'Sponsored') + '</div>' +
+                    '<div class="stitle">' + s.title + '</div>' +
+                    '<div class="sdesc">' + s.desc + '</div>';
+      grid.appendChild(a);
+    });
+    section.style.display = 'block';
+  }
+}
+renderSponsors();
+
+/* ---------- APP LOGIC ---------- */
+
+let extractedText = "";
+let extractedSource = "";
+
+const tabs = document.querySelectorAll('.tab');
+const panelUpload = document.getElementById('panel-upload');
+const panelPaste = document.getElementById('panel-paste');
+tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  if(t.dataset.tab === 'upload'){
+    panelUpload.style.display = 'block';
+    panelPaste.style.display = 'none';
+  } else {
+    panelUpload.style.display = 'none';
+    panelPaste.style.display = 'block';
+  }
+}));
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fname = document.getElementById('fname');
+const errorMsg = document.getElementById('errorMsg');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if(e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function showError(msg){
+  errorMsg.textContent = msg;
+  errorMsg.style.display = 'block';
+}
+function clearError(){
+  errorMsg.style.display = 'none';
+}
+
+async function handleFile(file){
+  clearError();
+  fname.textContent = "Reading " + file.name + "…";
+  try{
+    const ext = file.name.split('.').pop().toLowerCase();
+    if(ext === 'txt'){
+      extractedText = await file.text();
+    } else if(ext === 'pdf'){
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+      let text = "";
+      for(let i=1; i<=pdf.numPages; i++){
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(it => it.str).join(' ') + '\n';
+      }
+      extractedText = text;
+    } else if(ext === 'docx'){
+      const buf = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({arrayBuffer: buf});
+      extractedText = result.value;
+    } else {
+      showError("That file type isn't supported yet — try .txt, .pdf, or .docx.");
+      fname.textContent = "";
+      return;
+    }
+    extractedSource = file.name;
+    fname.textContent = file.name + " — " + extractedText.trim().split(/\s+/).length + " words loaded";
+  } catch(err){
+    showError("Couldn't read that file: " + err.message);
+    fname.textContent = "";
+  }
+}
+
+const goBtn = document.getElementById('goBtn');
+const regenBtn = document.getElementById('regenBtn');
+const loading = document.getElementById('loading');
+const loadText = document.getElementById('loadText');
+const results = document.getElementById('results');
+
+const loadMessages = [
+  "Reading so you don't have to…",
+  "Finding the point…",
+  "Skipping the boring parts…",
+  "Distilling the plot…",
+  "Cutting the filler…"
+];
+let loadInterval;
+
+function startLoading(){
+  loading.classList.add('show');
+  results.classList.remove('show');
+  goBtn.disabled = true;
+  let i = 0;
+  loadText.textContent = loadMessages[0];
+  loadInterval = setInterval(() => {
+    i = (i+1) % loadMessages.length;
+    loadText.textContent = loadMessages[i];
+  }, 1400);
+}
+function stopLoading(){
+  loading.classList.remove('show');
+  goBtn.disabled = false;
+  clearInterval(loadInterval);
+}
+
+function getActiveText(){
+  const activeTab = document.querySelector('.tab.active').dataset.tab;
+  if(activeTab === 'paste'){
+    return document.getElementById('pasteArea').value.trim();
+  }
+  return extractedText.trim();
+}
+
+function wordCount(str){
+  return (str.match(/\S+/g) || []).length;
+}
+
+function extractResponseText(response){
+  if(typeof response === 'string') return response;
+  if(response && response.message && Array.isArray(response.message.content)){
+    return response.message.content.map(b => b.text || '').join('');
+  }
+  if(response && typeof response.text === 'string') return response.text;
+  return JSON.stringify(response);
+}
+
+async function summarize(){
+  clearError();
+  const text = getActiveText();
+  if(!text || wordCount(text) < 20){
+    showError("Add a bit more text first — upload a file or paste something with real content.");
+    return;
+  }
+
+  const length = document.getElementById('lengthSelect').value;
+  const language = document.getElementById('langSelect').value;
+
+  const lengthGuide = {
+    quick: "3-4 short sentences maximum, ruthlessly compressed to just the core point",
+    standard: "one solid paragraph of about 120-180 words",
+    detailed: "two to three paragraphs of about 300-400 words total, covering the full arc/argument"
+  };
+
+  let inputText = text;
+  const words = wordCount(inputText);
+  let truncatedNote = "";
+  const MAX_WORDS = 15000;
+  if(words > MAX_WORDS){
+    inputText = inputText.split(/\s+/).slice(0, MAX_WORDS).join(' ');
+    truncatedNote = " (Note: only the first ~" + MAX_WORDS + " words were used because the text was very long.)";
+  }
+
+  startLoading();
+
+  try{
+    const prompt =
+      "You summarize books, articles, and texts for people who don't want to read the whole thing. " +
+      "Respond ONLY with valid JSON, no markdown fences, no preamble, in this exact shape: " +
+      '{"summary": "string", "keyPoints": ["string", "string", "string"]}' +
+      " The summary must be written entirely in " + language + ", length: " + lengthGuide[length] + ". " +
+      "keyPoints should be 3 to 6 short, punchy bullet points (also in " + language + ") capturing the most important takeaways, each under 20 words. " +
+      "Do not include any text outside the JSON object.\n\nText to summarize:\n\n" + inputText;
+
+    const response = await puter.ai.chat(prompt, { model: 'claude-sonnet-4-6' });
+    const rawText = extractResponseText(response);
+    const cleaned = rawText.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    const originalMinutes = Math.max(1, Math.round(words / 200));
+    const summaryWords = wordCount(parsed.summary) + parsed.keyPoints.reduce((a,b)=>a+wordCount(b),0);
+    const summaryMinutes = Math.max(1, Math.round(summaryWords / 200));
+    const saved = Math.max(0, originalMinutes - summaryMinutes);
+
+    document.getElementById('statOriginal').textContent = originalMinutes;
+    document.getElementById('statSummary').textContent = summaryMinutes;
+    document.getElementById('statSaved').textContent = saved;
+
+    document.getElementById('summaryText').textContent = parsed.summary + (truncatedNote ? "\n\n" + truncatedNote : "");
+    const kpList = document.getElementById('keyPoints');
+    kpList.innerHTML = "";
+    parsed.keyPoints.forEach(pt => {
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="bullet">—</span><span></span>';
+      li.querySelector('span:last-child').textContent = pt;
+      kpList.appendChild(li);
+    });
+
+    results.classList.add('show');
+  } catch(err){
+    showError("Something went wrong generating the summary: " + (err.message || err));
+  } finally{
+    stopLoading();
+  }
+}
+
+goBtn.addEventListener('click', summarize);
+regenBtn.addEventListener('click', summarize);
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const summary = document.getElementById('summaryText').textContent;
+  const points = Array.from(document.querySelectorAll('#keyPoints li span:last-child')).map(s => "- " + s.textContent).join('\n');
+  navigator.clipboard.writeText(summary + "\n\nKey points:\n" + points);
+  const btn = document.getElementById('copyBtn');
+  const original = btn.textContent;
+  btn.textContent = "Copied";
+  setTimeout(() => btn.textContent = original, 1500);
+});
+</script>
+</body>
+</html>
